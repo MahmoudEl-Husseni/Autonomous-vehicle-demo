@@ -1,0 +1,8 @@
+onnx
+numpy
+torch
+colorama
+matplotlib
+tensorflow
+torch_tb_profiler
+efficientnet_pytorch

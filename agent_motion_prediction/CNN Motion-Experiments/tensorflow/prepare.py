@@ -9,7 +9,7 @@ from render import *
 from config import *
 
 def render(out_path, 
-           data, 
+           data,
            n_shards=8, 
            validate=True, 
            use_vectorize=False, 
@@ -37,19 +37,26 @@ def render(out_path,
     dataset = tf.data.TFRecordDataset(
         [os.path.join(data, f) for f in files], num_parallel_reads=1
     )
+
+
     if n_shards > 1:
         dataset = dataset.shard(n_shards, each)
 
     p = multiprocessing.Pool(n_jobs)
     proc_id = 0
     res = []
-    for data in tqdm(dataset.as_numpy_iterator()):
+    
+    for data in tqdm(dataset):
+
         proc_id += 1
+        example = tf.train.Example()
+        example.ParseFromString(data.numpy())
+        
         res.append(
             p.apply_async(
                 merge,
                 kwds=dict(
-                    data=data,
+                    data=example,
                     proc_id=proc_id,
                     validate=not no_valid,
                     out_dir=out_path,
@@ -57,9 +64,9 @@ def render(out_path,
                 ),
             )
         )
-
     for r in tqdm(res):
         r.get()
+
 
 if __name__=="__main__":
 

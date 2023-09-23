@@ -349,7 +349,7 @@ def ohe(N, n, zero):
 
 
 def make_2d(arraylist):
-    n = len(arraylist)
+    n = len(arraylist.value)
     k = arraylist[0].shape[0]
     a2d = np.zeros((n, k))
     for i in range(n):
@@ -570,62 +570,71 @@ def vectorize(
 def merge(
     data, proc_id, validate, out_dir, use_vectorize=False, max_rand_int=10000000000
 ):
-    parsed = tf.io.parse_single_example(data, features_description)
+    # parsed = tf.io.parse_single_example(data, features_description)
+    parsed = data.features.feature
     raster_data = rasterize(
-        parsed["state/tracks_to_predict"].numpy(),
-        parsed["state/past/x"].numpy(),
-        parsed["state/past/y"].numpy(),
-        parsed["state/current/x"].numpy(),
-        parsed["state/current/y"].numpy(),
-        parsed["state/current/bbox_yaw"].numpy(),
-        parsed["state/past/bbox_yaw"].numpy(),
-        parsed["state/past/valid"].numpy(),
-        parsed["state/current/valid"].numpy(),
-        parsed["state/type"].numpy(),
-        parsed["roadgraph_samples/xyz"].numpy(),
-        parsed["roadgraph_samples/type"].numpy(),
-        parsed["roadgraph_samples/valid"].numpy(),
-        parsed["roadgraph_samples/id"].numpy(),
-        parsed["state/current/width"].numpy(),
-        parsed["state/current/length"].numpy(),
-        parsed["state/id"].numpy(),
-        parsed["traffic_light_state/current/state"].numpy(),
-        parsed["traffic_light_state/current/id"].numpy(),
-        parsed["traffic_light_state/current/valid"].numpy(),
-        parsed["state/future/x"].numpy(),
-        parsed["state/future/y"].numpy(),
-        parsed["state/future/valid"].numpy(),
-        parsed["scenario/id"].numpy()[0].decode("utf-8"),
+        np.array(parsed["state/tracks_to_predict"].int64_list.value).reshape(128),
+        np.array(parsed["state/past/x"].float_list.value).reshape(128, 10),
+        np.array(parsed["state/past/y"].float_list.value).reshape(128, 10),
+        np.array(parsed["state/current/x"].float_list.value).reshape(128, 1),
+        np.array(parsed["state/current/y"].float_list.value).reshape(128, 1),
+        np.array(parsed["state/current/bbox_yaw"].float_list.value).reshape(128, 1),
+        np.array(parsed["state/past/bbox_yaw"].float_list.value).reshape(128, 10),
+        np.array(parsed["state/past/valid"].int64_list.value).reshape(128, 10),
+        np.array(parsed["state/current/valid"].int64_list.value).reshape(128, 1),
+        np.array(parsed["state/type"].float_list.value).reshape(128),
+
+        np.array(parsed["roadgraph_samples/xyz"].float_list.value).reshape(-1, 3),
+        np.array(parsed["roadgraph_samples/type"].int64_list.value).reshape(-1, 1),
+        np.array(parsed["roadgraph_samples/valid"].int64_list.value).reshape(-1, 1),
+        np.array(parsed["roadgraph_samples/id"].int64_list.value).reshape(-1, 1),
+
+        np.array(parsed["state/current/width"].float_list.value).reshape(128, 1),
+        np.array(parsed["state/current/length"].float_list.value).reshape(128, 1),
+        np.array(parsed["state/id"].float_list.value).reshape(128),
+
+        np.array(parsed["traffic_light_state/current/state"].int64_list.value).reshape(1, 16),
+        np.array(parsed["traffic_light_state/current/id"].int64_list.value).reshape(1, 16),
+        np.array(parsed["traffic_light_state/current/valid"].int64_list.value).reshape(1, 16),
+
+        np.array(parsed["state/future/x"].float_list.value).reshape(128, 80),
+        np.array(parsed["state/future/y"].float_list.value).reshape(128, 80),
+        np.array(parsed["state/future/valid"].int64_list.value).reshape(128, 80),
+        np.array(parsed["scenario/id"].bytes_list.value)[0].decode("utf-8"),
         validate=validate,
     )
 
     if use_vectorize:
         vector_data = vectorize(
-            parsed["state/past/x"].numpy(),
-            parsed["state/current/x"].numpy(),
-            parsed["state/past/y"].numpy(),
-            parsed["state/current/y"].numpy(),
-            parsed["state/past/valid"].numpy(),
-            parsed["state/current/valid"].numpy(),
-            parsed["state/past/speed"].numpy(),
-            parsed["state/current/speed"].numpy(),
-            parsed["state/past/vel_yaw"].numpy(),
-            parsed["state/current/vel_yaw"].numpy(),
-            parsed["state/past/bbox_yaw"].numpy(),
-            parsed["state/current/bbox_yaw"].numpy(),
-            parsed["state/id"].numpy(),
-            parsed["state/type"].numpy(),
-            parsed["roadgraph_samples/id"].numpy(),
-            parsed["roadgraph_samples/type"].numpy(),
-            parsed["roadgraph_samples/valid"].numpy(),
-            parsed["roadgraph_samples/xyz"].numpy(),
-            parsed["traffic_light_state/current/id"].numpy(),
-            parsed["traffic_light_state/current/state"].numpy(),
-            parsed["traffic_light_state/current/valid"].numpy(),
-            parsed["state/current/width"].numpy(),
-            parsed["state/current/length"].numpy(),
-            parsed["state/tracks_to_predict"].numpy(),
-            parsed["state/future/valid"].numpy(),
+            np.array(parsed["state/past/x"].float_list.value).reshape(128, 10),
+            np.array(parsed["state/current/x"].float_list.value).reshape(128, 1),
+            np.array(parsed["state/past/y"].float_list.value).reshape(128, 10),
+            np.array(parsed["state/current/y"].float_list.value).reshape(128, 10),
+            np.array(parsed["state/past/valid"].int64_list.value).reshape(128, 10),
+            np.array(parsed["state/current/valid"].int64_list.value).reshape(128, 1),
+            np.array(parsed["state/past/speed"].float_list.value).reshape(128, 10),
+            np.array(parsed["state/current/speed"].float_list.value).reshape(128, 1),
+            np.array(parsed["state/past/vel_yaw"].float_list.value).reshape(128, 10),
+            np.array(parsed["state/current/vel_yaw"].float_list.value).reshape(128, 1),
+            np.array(parsed["state/past/bbox_yaw"].float_list.value).reshape(128, 10),
+            np.array(parsed["state/current/bbox_yaw"].float_list.value).reshape(128, 1),
+            np.array(parsed["state/id"].float_list.value).reshape(128),
+            np.array(parsed["state/type"].float_list.value).reshape(128),
+
+            np.array(parsed["roadgraph_samples/id"].int64_list.value).reshape(-1, 1),
+            np.array(parsed["roadgraph_samples/type"].int64_list.value).reshape(-1, 1),
+            np.array(parsed["roadgraph_samples/valid"].int64_list.value).reshape(-1, 1),
+            np.array(parsed["roadgraph_samples/xyz"].float_list.value).reshape(-1, 3),
+
+            np.array(parsed["traffic_light_state/current/id"].int64_list.value).reshape(1, 16),
+            np.array(parsed["traffic_light_state/current/state"].int64_list.value).reshape(1, 16),
+            np.array(parsed["traffic_light_state/current/valid"].int64_list.value).reshape(1, 16),
+
+            np.array(parsed["state/current/width"].float_list.value).reshape(128, 1),
+            np.array(parsed["state/current/length"].float_list.value).reshape(128, 1),
+            np.array(parsed["state/tracks_to_predict"].int64_list.value).reshape(128),
+            np.array(parsed["state/future/valid"].int64_list.value).reshape(128, 80),
+            
             validate=validate,
         )
 
@@ -654,13 +663,16 @@ def main():
     p = multiprocessing.Pool(args.n_jobs)
     proc_id = 0
     res = []
-    for data in tqdm(dataset.as_numpy_iterator()):
+    for data in dataset:
         proc_id += 1
+        example = tf.train.Example()
+        example.ParseFromString(data.numpy())
+        
         res.append(
             p.apply_async(
                 merge,
                 kwds=dict(
-                    data=data,
+                    data=example,
                     proc_id=proc_id,
                     validate=not args.no_valid,
                     out_dir=args.out,
@@ -668,7 +680,6 @@ def main():
                 ),
             )
         )
-
     for r in tqdm(res):
         r.get()
 

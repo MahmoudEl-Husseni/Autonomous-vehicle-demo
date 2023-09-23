@@ -183,5 +183,22 @@ if __name__=="__main__":
       print("Val Loss: {}".format(val_loss.item()))
 
 
-
   prof.stop()
+  writer.close()
+  print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=10))
+  prof.export_chrome_trace("trace.json")
+
+  # Test loop
+  with torch.no_grad():
+    for i, data in enumerate(test_loader):
+      print("\r", end=f'{progress_bar(i, length=75, train_set_len=len(test_set), train_bs=config.TEST_BS)}')
+
+      test_loss, test_mse = train(data)
+      writer.add_scalar('Loss/test', test_loss, epoch)
+      writer.add_scalar('MSE/test', test_mse, epoch)
+      
+      # break
+    print("Test Loss: {}".format(test_loss.item()))
+
+  # Save model
+  torch.save(eff_model.state_dict(), os.path.join(DIR.OUT_DIR, "model.pth"))

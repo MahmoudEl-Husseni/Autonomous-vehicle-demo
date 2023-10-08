@@ -1,7 +1,2 @@
-onnx
-torch
 colorama
-matplotlib
-torch_tb_profiler
 efficientnet_pytorch
-

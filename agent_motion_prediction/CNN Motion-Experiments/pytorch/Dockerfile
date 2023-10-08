@@ -1,5 +1,5 @@
-FROM tensorflow/tensorflow
+FROM nvcr.io/nvidia/pytorch:23.08-py3
 ADD . .
-RUN pip3 install -r tf_requirments.txt
+RUN pip3 install -r torch_requirments.txt
 ENV PYTHONUNBUFFERED=1
-CMD [ "python", "./train.py"]
+CMD ["python3", "/workspace/train.py"]

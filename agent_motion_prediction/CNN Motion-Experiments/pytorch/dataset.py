@@ -5,8 +5,7 @@ from config import *
 
 import torch
 import torch.nn as nn
-from torch.utils.data.dataloader import default_collate
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset
 
 
 class WaymoDataset(Dataset):
@@ -22,9 +21,11 @@ class WaymoDataset(Dataset):
     A PyTorch Dataset object containing the Waymo Open Dataset data.
   """
   
-  def __init__(self, data_path=DIR.RENDER_DIR, type='train', device=config.DEVICE):
+  def __init__(self, data_path=DIR.RENDER_DIR, type='train', device=config.DEVICE, 
+               vis=False):
     self.path = data_path
     self.type = type
+    self.vis = vis
 
     self.path = os.path.join(self.path, self.type)
     self.data_paths = os.listdir(self.path)
@@ -41,10 +42,12 @@ class WaymoDataset(Dataset):
     rasters = []
     trajs = []
     is_available = []
+    DATA = []
     for p in serial_path:
 
       serial_path = os.path.join(self.path, p)
       data = np.load(serial_path, allow_pickle=True)
+      DATA.append(data)
       raster = data['raster']
       raster = raster.transpose(2, 1, 0)
 
@@ -57,5 +60,8 @@ class WaymoDataset(Dataset):
     trajs = torch.Tensor(np.array(trajs))
     trajs = torch.flatten(trajs, start_dim=1)
     is_available = torch.Tensor(np.array(is_available))
+    
+    if self.vis:
+      return DATA
     
     return torch.Tensor(rasters), trajs, is_available

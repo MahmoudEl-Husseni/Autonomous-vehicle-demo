@@ -5,8 +5,12 @@ from config import *
 from dataset import *
 from visualize import *
 
+import time
+# time.sleep(30)
+
 import os
 import cv2
+import logging
 import numpy as np
 
 import torch
@@ -162,8 +166,27 @@ def train(batch, train=True, loss_ciretria='neg_multi_log_likelihood'):
   fde = final_displacement_error(y.view(-1, 80, 2), y_pred_best.view(-1, 80, 2), is_available.view(-1, 80, 1))
   return loss, mse, mde, fde
 
+def vis_model(model, dataset, epoch, t='train', use_top1=True, save=False): 
+  with torch.no_grad():
+    for i in range(4):
+      data = dataset[i][0]
+      output = model(torch.Tensor(data['raster']).to(config.DEVICE).reshape(-1, 25, 224, 224))
+      logits, confidences = output[:, :-config.N_TRAJ], output[:, -config.N_TRAJ:]
+
+      logits = logits.view(config.N_TRAJ, config.FUTURE_TS, 2)
+      confidences = confidences.view(config.N_TRAJ, 1)
+
+      fig_path = os.path.join(DIR.VIS_DIR, f"epoch_{epoch}_{t}_{i}.png")
+      plot_pred(data, logits, confidences, use_top1=use_top1, save=save, save_path=fig_path)
+      img = cv2.imread(fig_path)
+      img = cv2.resize(img, (config.VIS_HEIGHT, config.VIS_WIDTH))
+      writer.add_image(f"{t}_{epoch}_{i}", img.transpose(2, 0, 1), 0)
+      if i == 4:
+        break
+
+
 if __name__=="__main__": 
-   
+
   # Create Dataset
   train_set = WaymoDataset(data_path=DIR.RENDER_DIR, type='train')
   val_set = WaymoDataset(data_path=DIR.RENDER_DIR, type='val')
@@ -232,8 +255,8 @@ if __name__=="__main__":
     os.makedirs(DIR.TB_DIR)
   if not os.path.exists(DIR.VIS_DIR):
     os.makedirs(DIR.VIS_DIR)
-
   
+  logging.basicConfig(filename=os.path.join(DIR.OUT_DIR, 'train.log'), encoding='utf-8', level=logging.DEBUG, format='%(levelname)s:%(asctime)s %(message)s')
   if not os.path.exists(os.path.join(DIR.OUT_DIR, "logs.csv")):
     with open(os.path.join(DIR.OUT_DIR, "logs.csv"), "w") as f:
       f.write("epoch,loss,mse,mde,fde\n")
@@ -257,94 +280,87 @@ if __name__=="__main__":
     print(f'{red}{"[INFO]:  "}{res}Epoch {blk}{f"#{epoch+1}/{config.EPOCHS}"}{res} started')
 
     # Training loop
-    for i, data in enumerate(train_loader):
-      print("\r", end=f'{progress_bar(i, length=75, train_set_len=len(train_set), train_bs=config.TRAIN_BS)}')
+    try: 
+      for i, data in enumerate(train_loader):
+        print("\r", end=f'{progress_bar(i, length=75, train_set_len=len(train_set), train_bs=config.TRAIN_BS)}')
+        logging.info(f"Training Epoch {epoch+1}, batch {i+1} / {len(train_loader)}")
 
-      loss, mse, mde, fde = train(data)
-      writer.add_scalar('Loss/train', loss, epoch)
-      writer.add_scalar('MSE/train', mse, epoch)
-      writer.add_scalar('MDE/train', mde, epoch)
-      writer.add_scalar('FDE/train', fde, epoch)
+        try:
+          loss, mse, mde, fde = train(data)
+        except Exception as e:
+          logging.error(e.__str__() + "Error in training, in Line: " + str(e.__traceback__.tb_lineno))
+        
 
-      prof.step()
-      
-      if i == 10:
-        break
+        try: 
+          writer.add_scalar('Loss/train', loss, epoch)
+          writer.add_scalar('MSE/train', mse, epoch)
+          writer.add_scalar('MDE/train', mde, epoch)
+          writer.add_scalar('FDE/train', fde, epoch)
+        except Exception as e:
+          logging.error(e.__str__() + "Error in writing to tensorboard, in Line " + str(e.__traceback__.tb_lineno))
+        
+        prof.step()
+        
+        # if i >= 1:
+        #   break
 
-    # Visualize
-    with torch.no_grad():
-      for i in range(4):
-        data = vis_train_set[i][0]
-        output = eff_model(torch.Tensor(data['raster']).to(config.DEVICE).reshape(-1, 25, 224, 224))
-        logits, confidences = output[:, :-config.N_TRAJ], output[:, -config.N_TRAJ:]
+      # Visualize train
+      try : 
+        vis_model(eff_model, vis_train_set, epoch, t='train', use_top1=True, save=True)
 
-        logits = logits.view(config.N_TRAJ, config.FUTURE_TS, 2)
-        confidences = confidences.view(config.N_TRAJ, 1)
+        # Visualize val
+        vis_model(eff_model, vis_val_set, epoch, t='val', use_top1=False, save=True)
+      except Exception as e:
+        logging.error(e.__str__() + "in Line " + str(e.__traceback__.tb_lineno))
 
-        fig_path = os.path.join(DIR.VIS_DIR, f"epoch_{epoch}_train_{i}.png")
-        plot_pred(data, logits, confidences, use_top1=True, save=True, save_path=fig_path)
-        img = cv2.imread(fig_path)
-        img = cv2.resize(img, (config.VIS_HEIGHT, config.VIS_WIDTH))
-        writer.add_image(f"train_{i}", img.transpose(2, 0, 1), 0)
-        if i == 4:
-          break
-    
-    with torch.no_grad():
-      for i in range(4):
-        data = vis_val_set[i][0]
-        output = eff_model(torch.Tensor(data['raster']).to(config.DEVICE).reshape(-1, 25, 224, 224))
-        logits, confidences = output[:, :-config.N_TRAJ], output[:, -config.N_TRAJ:]
-
-        logits = logits.view(config.N_TRAJ, config.FUTURE_TS, 2)
-        confidences = confidences.view(config.N_TRAJ, 1)
-
-        fig_path = os.path.join(DIR.VIS_DIR, f"epoch_{epoch}_val_{i}.png")
-        plot_pred(data, logits, confidences, use_top1=True, save=True, save_path=fig_path)
-        img = cv2.imread(fig_path)
-        img = cv2.resize(img, (config.VIS_HEIGHT, config.VIS_WIDTH))
-        writer.add_image(f"val_{i}", img.transpose(2, 0, 1), 0)
-
-        if i == 4:
-          break
-    
-
-    print("Train Loss: {}".format(loss.item()))
+      print("Train Loss: {}".format(loss.item()))
 
 
-    # write logs to csv file
-    with open(os.path.join(DIR.OUT_DIR, "logs.csv"), "a") as f:
-      f.write(f"{epoch+1},{loss.item()},{mse.item()},{mde.item()},{fde.item()}\n")
-
-    # Checkpoint loop
-    if epoch % config.CKPT_EPOCH == 0:
-      torch.save(eff_model.state_dict(), os.path.join(DIR.CKPT_DIR, f"model_{epoch}.pth"))
-
-    # Save checkpoints
-    torch.save(eff_model.state_dict(), os.path.join(DIR.CKPT_DIR, "last_model.pth"))
-
-    # save best model and write logs to csv file
-    if loss.item() < best_loss:
-      best_loss = loss.item()
-      torch.save(eff_model.state_dict(), os.path.join(DIR.CKPT_DIR, "best_model.pth"))
-      with open(os.path.join(DIR.OUT_DIR, "best_logs.csv"), "a") as f:
+      # write logs to csv file
+      with open(os.path.join(DIR.OUT_DIR, "logs.csv"), "a") as f:
         f.write(f"{epoch+1},{loss.item()},{mse.item()},{mde.item()},{fde.item()}\n")
 
+      # Checkpoint loop
+      if epoch % config.CKPT_EPOCH == 0:
+        torch.save(eff_model.state_dict(), os.path.join(DIR.CKPT_DIR, f"model_{epoch}.pth"))
 
-    # Validation loop
-    with torch.no_grad():
-      for i, data in enumerate(val_loader):
-        print("\r", end=f'{progress_bar(i, length=75, train_set_len=len(val_set), train_bs=config.VAL_BS)}')
+      # Save checkpoints
+      torch.save(eff_model.state_dict(), os.path.join(DIR.CKPT_DIR, "last_model.pth"))
 
-        val_loss, val_mse, val_mde, val_fde = train(data, train=False)
-        writer.add_scalar('Loss/val', val_loss, epoch)
-        writer.add_scalar('MSE/val', val_mse, epoch)
-        writer.add_scalar('MDE/val', val_mde, epoch)
-        writer.add_scalar('FDE/val', val_fde, epoch)
+      # save best model and write logs to csv file
+      if loss.item() < best_loss:
+        best_loss = loss.item()
+        torch.save(eff_model.state_dict(), os.path.join(DIR.CKPT_DIR, "best_model.pth"))
+        with open(os.path.join(DIR.OUT_DIR, "best_logs.csv"), "a") as f:
+          f.write(f"{epoch+1},{loss.item()},{mse.item()},{mde.item()},{fde.item()}\n")
 
-        if i == 10:
-          break
 
-      print("Val Loss: {}".format(val_loss.item()))
+      # Validation loop
+      with torch.no_grad():
+        for i, data in enumerate(val_loader):
+          print("\r", end=f'{progress_bar(i, length=75, train_set_len=len(val_set), train_bs=config.VAL_BS)}')
+          logging.info(f"Validation Epoch {epoch+1}, batch {i+1} / {len(val_loader)}")
+
+          try: 
+            val_loss, val_mse, val_mde, val_fde = train(data, train=False)
+          except Exception as e:
+            logging.error(e.__str__() + "Error in validation, in Line " + str(e.__traceback__.tb_lineno))
+
+          try: 
+            writer.add_scalar('Loss/val', val_loss, epoch)
+            writer.add_scalar('MSE/val', val_mse, epoch)
+            writer.add_scalar('MDE/val', val_mde, epoch)
+            writer.add_scalar('FDE/val', val_fde, epoch)
+          except Exception as e:
+            logging.error(e.__str__() + "Error in writing to tensorboard, in Line " + str(e.__traceback__.tb_lineno))
+
+          # if i >= 1:
+          #   break
+
+        print("Val Loss: {}".format(val_loss.item()))
+    except Exception as e:
+      logging.error(e.__str__() + f"in epoch {epoch+1}, in Line" + str(e.__traceback__.tb_lineno))
+      continue
 
   prof.stop()
   writer.close()

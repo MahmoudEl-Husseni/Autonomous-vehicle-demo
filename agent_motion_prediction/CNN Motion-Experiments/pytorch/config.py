@@ -21,6 +21,7 @@ class config:
 
   LR = 1e-3
   EPOCHS = 100
+  LOG_STEP=10
   DEVICE = 'cuda'
   LOSS = 'neg_multi_log_likelihood'
 

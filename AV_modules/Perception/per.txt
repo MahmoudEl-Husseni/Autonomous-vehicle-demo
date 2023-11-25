@@ -1,3 +1,0 @@
-lane and road detection
-traffic signs detection
-semantic segmentation
